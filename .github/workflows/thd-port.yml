@@ -1,0 +1,98 @@
+name: THD Port (analisar / converter)
+
+# Etapa "analisar": lê o APK do Sonic 4 Ep. II THD e gera um relatório (aba Summary da execução).
+# Etapa "converter": aplica correções de compatibilidade, reconstrói, alinha e assina o APK.
+# O APK original vem de uma Release do próprio repositório (tag padrão: apk).
+
+on:
+  workflow_dispatch:
+    inputs:
+      etapa:
+        description: "O que fazer"
+        type: choice
+        default: analisar
+        options:
+          - analisar
+          - converter
+      tag:
+        description: "Tag da Release que contém o APK do THD (e o OBB, se houver)"
+        type: string
+        default: apk
+      target_sdk:
+        description: "Só no converter: novo targetSdk (vazio = não mexer)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  thd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      TARGET_SDK: ${{ inputs.target_sdk }}
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v6
+
+      - name: Instalar o JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Baixar o APK (e OBB) da Release
+        run: |
+          mkdir -p entrada saida
+          gh release download "$TAG" --dir entrada --pattern '*.apk' --pattern '*.obb'
+          ls -lh entrada
+          APK="$(ls -S entrada/*.apk | head -n 1)"
+          echo "APK=$APK" >> "$GITHUB_ENV"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          echo "BUILD_TOOLS=$BT" >> "$GITHUB_ENV"
+
+      - name: Analisar o APK
+        if: inputs.etapa == 'analisar'
+        run: |
+          bash tools/analisar.sh "$APK" saida entrada
+          cat saida/relatorio.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Baixar o apktool
+        if: inputs.etapa == 'converter'
+        run: |
+          mkdir -p tools/bin
+          gh release download --repo iBotPeaches/Apktool --pattern 'apktool_*.jar' --dir tools/bin --clobber
+          mv tools/bin/apktool_*.jar tools/bin/apktool.jar
+
+      - name: Converter o APK
+        if: inputs.etapa == 'converter'
+        run: |
+          bash tools/converter.sh "$APK" saida "$TARGET_SDK" | tee saida/log-converter.txt
+          {
+            echo "## Conversão concluída"
+            echo '```'
+            tail -n 40 saida/log-converter.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar o APK convertido numa Release (tag thd-convertido)
+        if: inputs.etapa == 'converter'
+        run: |
+          gh release view thd-convertido > /dev/null 2>&1 || \
+            gh release create thd-convertido --title "THD convertido" \
+              --notes "APK gerado pelo workflow THD Port" --prerelease
+          gh release upload thd-convertido saida/thd-convertido.apk --clobber
+
+      - name: Guardar relatório e logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: thd-relatorios
+          path: |
+            saida/*.md
+            saida/*.txt
+          if-no-files-found: ignore
