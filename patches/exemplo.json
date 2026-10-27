@@ -1,0 +1,19 @@
+{
+  "_comentario": "EXEMPLO (não é aplicado). Copie regras para regras.json.",
+  "regras": [
+    {
+      "tipo": "texto",
+      "arquivos": "smali*/**/MainActivity.smali",
+      "procurar": "const/4 v0, 0x1",
+      "trocar": "const/4 v0, 0x0",
+      "obrigatorio": false
+    },
+    {
+      "tipo": "hex",
+      "arquivos": "lib/armeabi-v7a/libexemplo.so",
+      "procurar": "74 65 67 72 61",
+      "trocar": "78 78 78 78 78",
+      "obrigatorio": false
+    }
+  ]
+}

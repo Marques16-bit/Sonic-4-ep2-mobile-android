@@ -1,0 +1,7 @@
+entrada/
+saida/
+tools/bin/
+*.apk
+*.obb
+.DS_Store
+__pycache__/

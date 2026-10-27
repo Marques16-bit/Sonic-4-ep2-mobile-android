@@ -1,0 +1,4 @@
+{
+  "_comentario": "Regras de correção aplicadas na etapa 'converter'. Vazio por enquanto: depois de rodar 'analisar', as regras são escritas sob medida. Veja patches/exemplo.json.",
+  "regras": []
+}
